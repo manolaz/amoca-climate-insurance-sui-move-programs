@@ -10,7 +10,7 @@ const OTHER_USER: address = @0xc;
 
 // Test constants
 const TEST_COVERAGE: u64 = 1000;
-const TEST_PREMIUM: u64 = 100;
+const TEST_PREMIUM: u64 = 1000;
 const TEST_DURATION: u64 = 86400; // 1 day
 const TEST_RAINFALL_TRIGGER: u64 = 150;
 const TEST_TEMPERATURE_TRIGGER: u64 = 35;
@@ -84,7 +84,7 @@ fun test_policy_activation_and_payout_flow() {
     // Evaluate trigger
     next_tx(&mut scenario, AUTHORITY);
     {
-        let mut state = ts::take_from_sender<GlobalState>(&scenario);
+        let mut state = ts::take_from_address<GlobalState>(&scenario, AUTHORITY);
         let mut policy = ts::take_from_address<ClimatePolicy>(&scenario, OWNER);
         let ctx = ts::ctx(&mut scenario);
         amoca_insurance_package::evaluate_climate_trigger(
@@ -96,44 +96,44 @@ fun test_policy_activation_and_payout_flow() {
             20,
             ctx,
         );
-        ts::return_to_sender(&scenario, state);
-        ts::return_to_sender(&scenario, policy);
+        ts::return_to_address(AUTHORITY, state);
+        ts::return_to_address(OWNER, policy);
     };
 
     // Check triggered
     next_tx(&mut scenario, AUTHORITY);
     {
-        let policy = ts::take_from_sender<ClimatePolicy>(&scenario);
+        let policy = ts::take_from_address<ClimatePolicy>(&scenario, OWNER);
         assert!(amoca_insurance_package::testing_policy_status(&policy) == 2, 3);
         assert!(
             amoca_insurance_package::testing_policy_pending_payout(&policy) == TEST_COVERAGE,
             4,
         );
-        ts::return_to_sender(&scenario, policy);
+        ts::return_to_address(OWNER, policy);
     };
 
     // Execute payout
     next_tx(&mut scenario, AUTHORITY);
     {
-        let mut state = ts::take_from_sender<GlobalState>(&scenario);
-        let mut policy = ts::take_from_sender<ClimatePolicy>(&scenario);
+        let mut state = ts::take_from_address<GlobalState>(&scenario, AUTHORITY);
+        let mut policy = ts::take_from_address<ClimatePolicy>(&scenario, OWNER);
         let ctx = ts::ctx(&mut scenario);
         amoca_insurance_package::execute_climate_payout(&mut state, &mut policy, ctx);
-        ts::return_to_sender(&scenario, state);
-        ts::return_to_sender(&scenario, policy);
+        ts::return_to_address(AUTHORITY, state);
+        ts::return_to_address(OWNER, policy);
     };
 
     // Check settled
     next_tx(&mut scenario, AUTHORITY);
     {
-        let state = ts::take_from_sender<GlobalState>(&scenario);
-        let policy = ts::take_from_sender<ClimatePolicy>(&scenario);
+        let state = ts::take_from_address<GlobalState>(&scenario, AUTHORITY);
+        let policy = ts::take_from_address<ClimatePolicy>(&scenario, OWNER);
         assert!(amoca_insurance_package::testing_policy_status(&policy) == 3, 5);
         assert!(amoca_insurance_package::testing_policy_pending_payout(&policy) == 0, 6);
         assert!(amoca_insurance_package::testing_state_risk_pool(&state) == 0, 7);
         assert!(amoca_insurance_package::testing_state_total_payouts(&state) == TEST_COVERAGE, 8);
-        ts::return_to_sender(&scenario, state);
-        ts::return_to_sender(&scenario, policy);
+        ts::return_to_address(AUTHORITY, state);
+        ts::return_to_address(OWNER, policy);
     };
 
     end(scenario);
