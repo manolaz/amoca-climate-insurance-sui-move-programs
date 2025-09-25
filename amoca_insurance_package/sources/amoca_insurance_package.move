@@ -1,7 +1,5 @@
 module amoca_insurance_package::amoca_insurance_package;
 
-use sui::object::{Self, UID};
-use sui::transfer;
 use sui::tx_context::{Self, TxContext};
 
 // ------------------------------------------------------------------------
@@ -37,8 +35,8 @@ const MIN_CONFIDENCE: u8 = 50;
 // ------------------------------------------------------------------------
 // Core data structures
 // ------------------------------------------------------------------------
-struct GlobalState has key, store {
-    id: UID,
+public struct GlobalState has key, store {
+    id: object::UID,
     authority: address,
     paused: bool,
     total_policies: u64,
@@ -47,8 +45,8 @@ struct GlobalState has key, store {
     risk_pool_balance: u64,
 }
 
-struct ClimatePolicy has key, store {
-    id: UID,
+public struct ClimatePolicy has key, store {
+    id: object::UID,
     owner: address,
     status: u8,
     coverage_amount: u64,
@@ -68,7 +66,7 @@ struct ClimatePolicy has key, store {
 // ------------------------------------------------------------------------
 // Initialization and administration
 // ------------------------------------------------------------------------
-public entry fun initialize(authority: address, ctx: &mut TxContext) {
+public fun initialize(authority: address, ctx: &mut tx_context::TxContext) {
     let sender = tx_context::sender(ctx);
     assert!(sender == authority, E_UNAUTHORIZED);
 
@@ -82,15 +80,15 @@ public entry fun initialize(authority: address, ctx: &mut TxContext) {
         risk_pool_balance: 0,
     };
 
-    transfer::transfer(state, authority);
+    sui::transfer::transfer(state, authority);
 }
 
-public entry fun pause_program(state: &mut GlobalState, ctx: &mut TxContext) {
+public fun pause_program(state: &mut GlobalState, ctx: &mut tx_context::TxContext) {
     assert_authority(state, tx_context::sender(ctx));
     state.paused = true;
 }
 
-public entry fun unpause_program(state: &mut GlobalState, ctx: &mut TxContext) {
+public fun unpause_program(state: &mut GlobalState, ctx: &mut tx_context::TxContext) {
     assert_authority(state, tx_context::sender(ctx));
     state.paused = false;
 }
@@ -98,7 +96,7 @@ public entry fun unpause_program(state: &mut GlobalState, ctx: &mut TxContext) {
 // ------------------------------------------------------------------------
 // Policy lifecycle helpers
 // ------------------------------------------------------------------------
-public entry fun create_climate_policy(
+public fun create_climate_policy(
     state: &mut GlobalState,
     owner: address,
     coverage_amount: u64,
@@ -108,7 +106,7 @@ public entry fun create_climate_policy(
     trigger_temperature: u64,
     measurement_period: u64,
     minimum_duration: u64,
-    ctx: &mut TxContext,
+    ctx: &mut tx_context::TxContext,
 ) {
     assert_not_paused(state);
 
@@ -137,14 +135,14 @@ public entry fun create_climate_policy(
     };
 
     state.total_policies = state.total_policies + 1;
-    transfer::transfer(policy, owner);
+    sui::transfer::transfer(policy, owner);
 }
 
-public entry fun deposit_premium(
+public fun deposit_premium(
     state: &mut GlobalState,
     policy: &mut ClimatePolicy,
     amount: u64,
-    ctx: &mut TxContext,
+    ctx: &mut tx_context::TxContext,
 ) {
     assert_not_paused(state);
     assert_owner(policy, tx_context::sender(ctx));
@@ -166,13 +164,13 @@ public entry fun deposit_premium(
     }
 }
 
-public entry fun submit_climate_data(
+public fun submit_climate_data(
     state: &GlobalState,
     policy: &mut ClimatePolicy,
     value: u64,
     timestamp: u64,
     confidence: u8,
-    ctx: &mut TxContext,
+    ctx: &mut tx_context::TxContext,
 ) {
     assert_not_paused(state);
     assert!(tx_context::sender(ctx) == state.authority, E_ORACLE_NOT_AUTHORIZED);
@@ -186,14 +184,14 @@ public entry fun submit_climate_data(
     policy.last_data_confidence = confidence;
 }
 
-public entry fun evaluate_climate_trigger(
+public fun evaluate_climate_trigger(
     state: &mut GlobalState,
     policy: &mut ClimatePolicy,
     rainfall_value: u64,
     temperature_value: u64,
     measurement_duration: u64,
     timestamp: u64,
-    ctx: &mut TxContext,
+    ctx: &mut tx_context::TxContext,
 ) {
     assert_not_paused(state);
     assert_owner_or_authority(policy, state, tx_context::sender(ctx));
@@ -216,10 +214,10 @@ public entry fun evaluate_climate_trigger(
     policy.last_data_confidence = 100;
 }
 
-public entry fun execute_climate_payout(
+public fun execute_climate_payout(
     state: &mut GlobalState,
     policy: &mut ClimatePolicy,
-    ctx: &mut TxContext,
+    ctx: &mut tx_context::TxContext,
 ) {
     assert_not_paused(state);
     assert_owner_or_authority(policy, state, tx_context::sender(ctx));
@@ -236,11 +234,11 @@ public entry fun execute_climate_payout(
     policy.status = STATUS_SETTLED;
 }
 
-public entry fun expire_policy(
+public fun expire_policy(
     state: &GlobalState,
     policy: &mut ClimatePolicy,
     timestamp: u64,
-    ctx: &mut TxContext,
+    ctx: &mut tx_context::TxContext,
 ) {
     assert_not_paused(state);
     assert_owner_or_authority(policy, state, tx_context::sender(ctx));
@@ -271,7 +269,7 @@ fun assert_owner_or_authority(policy: &ClimatePolicy, state: &GlobalState, sende
 }
 
 #[test_only]
-public fun testing_new_state(authority: address, ctx: &mut TxContext): GlobalState {
+public fun testing_new_state(authority: address, ctx: &mut tx_context::TxContext): GlobalState {
     GlobalState {
         id: object::new(ctx),
         authority,
@@ -293,7 +291,7 @@ public fun testing_new_policy(
     trigger_temperature: u64,
     measurement_period: u64,
     minimum_duration: u64,
-    ctx: &mut TxContext,
+    ctx: &mut tx_context::TxContext,
 ): ClimatePolicy {
     ClimatePolicy {
         id: object::new(ctx),
@@ -312,4 +310,29 @@ public fun testing_new_policy(
         last_data_value: 0,
         last_data_confidence: 0,
     }
+}
+
+#[test_only]
+public fun testing_policy_status(policy: &ClimatePolicy): u8 {
+    policy.status
+}
+
+#[test_only]
+public fun testing_policy_pending_payout(policy: &ClimatePolicy): u64 {
+    policy.pending_payout
+}
+
+#[test_only]
+public fun testing_state_total_premiums(state: &GlobalState): u64 {
+    state.total_premiums_collected
+}
+
+#[test_only]
+public fun testing_state_risk_pool(state: &GlobalState): u64 {
+    state.risk_pool_balance
+}
+
+#[test_only]
+public fun testing_state_total_payouts(state: &GlobalState): u64 {
+    state.total_payouts_released
 }
