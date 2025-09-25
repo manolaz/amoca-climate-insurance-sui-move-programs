@@ -1,6 +1,6 @@
 # AMOCA Climate Insurance
 
-A decentralized parametric climate insurance protocol built on Sui using the Anchor framework. AMOCA provides automated climate risk protection through verifiable environmental data from oracles, enabling instant payouts when predefined climate thresholds are met.
+A decentralized parametric climate insurance protocol built on Sui. AMOCA provides automated climate risk protection through verifiable environmental data from oracles, enabling instant payouts when predefined climate thresholds are met.
 
 ## 🌍 Overview
 
@@ -61,7 +61,6 @@ Climate change poses increasing risks to agriculture, property, and livelihoods 
 
 - [Rust](https://rustlang.org/tools/install)
 - [Sui CLI](https://docs.Sui.com/cli/install-Sui-cli-tools)
-- [Anchor Framework](https://www.anchor-lang.com/docs/installation)
 - [Node.js](https://nodejs.org/) and [Yarn](https://yarnpkg.com/)
 
 ### Installation
@@ -82,42 +81,36 @@ Climate change poses increasing risks to agriculture, property, and livelihoods 
 3. **Build the program**
 
    ```bash
-   anchor build
+   sui move build
    ```
 
 4. **Deploy to localnet**
 
    ```bash
-   anchor deploy
+   sui client publish
    ```
 
 5. **Run tests**
 
    ```bash
-   anchor test
+   sui move test
    ```
 
 ### Configuration
 
-Update `Anchor.toml` with your desired network settings:
+Update `Move.toml` with your desired network settings:
 
 ```toml
-[features]
-seeds = false
-skip-lint = false
+[package]
+name = "amoca_insurance_package"
+version = "0.1.0"
+edition = "2024.beta"
 
-[programs.localnet]
-amoca_climate_insurance = "8a2BSK86azg8kL6Cbd2wvEswnn2eKyS3CSZSgXpfTzTc"
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "devnet" }
 
-[registry]
-url = "https://api.apr.dev"
-
-[provider]
-cluster = "Localnet"
-wallet = "~/.config/Sui/id.json"
-
-[scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+[addresses]
+amoca_insurance_package = "0x0"
 ```
 
 ## 📚 Program Instructions
@@ -128,11 +121,13 @@ test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
 Initialize the global program state and risk pool.
 
-**Accounts:**
+**Parameters:**
 
-- `authority` - Program authority (signer)
-- `global_state` - Global state PDA
-- `system_program` - Sui System Program
+- `authority: address` - Program authority
+
+**Context:**
+
+- `ctx: &mut TxContext` - Transaction context
 
 #### `create_climate_policy`
 
@@ -140,19 +135,19 @@ Create a new parametric climate insurance policy.
 
 **Parameters:**
 
-- `params: PolicyParams` - Policy configuration including:
-  - `policy_type` - Type of climate risk (drought, flood, etc.)
-  - `geographic_bounds` - Coverage area coordinates
-  - `trigger_conditions` - Climate thresholds for payouts
-  - `coverage_amount` - Maximum payout amount
-  - `premium_amount` - Required premium payment
-  - `end_timestamp` - Policy expiration time
+- `state: &mut GlobalState` - Global state object
+- `owner: address` - Policy owner
+- `coverage_amount: u64` - Maximum payout amount
+- `premium_amount: u64` - Required premium payment
+- `end_timestamp: u64` - Policy expiration time
+- `trigger_rainfall: u64` - Rainfall trigger threshold
+- `trigger_temperature: u64` - Temperature trigger threshold
+- `measurement_period: u64` - Measurement period
+- `minimum_duration: u64` - Minimum duration for trigger
 
-**Accounts:**
+**Context:**
 
-- `owner` - Policy owner (signer)
-- `policy` - Policy account PDA
-- `global_state` - Global state account
+- `ctx: &mut TxContext` - Transaction context
 
 #### `deposit_premium`
 
@@ -160,15 +155,13 @@ Deposit premium to activate a climate insurance policy.
 
 **Parameters:**
 
+- `state: &mut GlobalState` - Global state object
+- `policy: &mut ClimatePolicy` - Policy object
 - `amount: u64` - Premium amount to deposit
 
-**Accounts:**
+**Context:**
 
-- `owner` - Policy owner (signer)
-- `policy` - Policy account
-- `user_token_account` - Owner's token account
-- `risk_pool_token_account` - Risk pool token account
-- `token_program` - SPL Token Program
+- `ctx: &mut TxContext` - Transaction context
 
 #### `submit_climate_data`
 
@@ -176,24 +169,32 @@ Submit verified climate data from oracle sources.
 
 **Parameters:**
 
-- `data_points: Vec<ClimateDataPoint>` - Array of climate measurements
+- `state: &GlobalState` - Global state object
+- `policy: &mut ClimatePolicy` - Policy object
+- `value: u64` - Climate data value
+- `timestamp: u64` - Data timestamp
+- `confidence: u8` - Confidence level
 
-**Accounts:**
+**Context:**
 
-- `oracle_provider` - Oracle provider (signer)
-- `oracle_data` - Oracle data account
-- `global_state` - Global state account
+- `ctx: &mut TxContext` - Transaction context
 
 #### `evaluate_climate_trigger`
 
 Evaluate policy trigger conditions against current climate data.
 
-**Accounts:**
+**Parameters:**
 
-- `evaluator` - Trigger evaluator (signer)
-- `policy` - Policy account
-- `oracle_data_accounts` - Oracle data accounts for evaluation
-- `global_state` - Global state account
+- `state: &mut GlobalState` - Global state object
+- `policy: &mut ClimatePolicy` - Policy object
+- `rainfall_value: u64` - Current rainfall value
+- `temperature_value: u64` - Current temperature value
+- `measurement_duration: u64` - Duration of measurement
+- `timestamp: u64` - Evaluation timestamp
+
+**Context:**
+
+- `ctx: &mut TxContext` - Transaction context
 
 #### `execute_climate_payout`
 
@@ -201,16 +202,12 @@ Execute automatic payout when trigger conditions are met.
 
 **Parameters:**
 
-- `payout_amount: u64` - Amount to pay out
+- `state: &mut GlobalState` - Global state object
+- `policy: &mut ClimatePolicy` - Policy object
 
-**Accounts:**
+**Context:**
 
-- `executor` - Payout executor (signer)
-- `policy` - Policy account
-- `policyholder_token_account` - Recipient token account
-- `risk_pool_token_account` - Risk pool token account
-- `risk_pool_pda` - Risk pool PDA signer
-- `token_program` - SPL Token Program
+- `ctx: &mut TxContext` - Transaction context
 
 ### Admin Instructions
 
@@ -218,10 +215,13 @@ Execute automatic payout when trigger conditions are met.
 
 Emergency controls for program operations.
 
-**Accounts:**
+**Parameters:**
 
-- `authority` - Program authority (signer)
-- `global_state` - Global state account
+- `state: &mut GlobalState` - Global state object
+
+**Context:**
+
+- `ctx: &mut TxContext` - Transaction context
 
 ## 🧪 Testing
 
@@ -229,13 +229,7 @@ The test suite covers all major functionality:
 
 ```bash
 # Run all tests
-anchor test
-
-# Run specific test file
-anchor test --file tests/amoca-climate-insurance.ts
-
-# Run with verbose output
-anchor test --verbose
+sui move test
 ```
 
 ### Test Coverage
@@ -251,50 +245,39 @@ anchor test --verbose
 
 ## 🏛️ Program Data Structures
 
+### `GlobalState`
+
+```move
+public struct GlobalState has key, store {
+    id: object::UID,
+    authority: address,
+    paused: bool,
+    total_policies: u64,
+    total_premiums_collected: u64,
+    total_payouts_released: u64,
+    risk_pool_balance: u64,
+}
+```
+
 ### `ClimatePolicy`
 
-```rust
-pub struct ClimatePolicy {
-    pub bump: u8,
-    pub owner: Pubkey,
-    pub status: PolicyStatus,
-    pub policy_type: ClimateRiskType,
-    pub geographic_bounds: GeoBounds,
-    pub trigger_thresholds: TriggerConditions,
-    pub oracle_sources: Vec<Pubkey>,
-    pub coverage_amount: u64,
-    pub premium_amount: u64,
-    pub start_timestamp: i64,
-    pub end_timestamp: i64,
-    // ... additional fields
-}
-```
-
-### `ClimateDataPoint`
-
-```rust
-pub struct ClimateDataPoint {
-    pub data_type: ClimateDataType,
-    pub location: GeographicCoordinate,
-    pub value: f64,
-    pub timestamp: i64,
-    pub confidence_level: u8,
-    pub source_id: Pubkey,
-    pub verification_hash: Vec<u8>,
-}
-```
-
-### `TriggerConditions`
-
-```rust
-pub struct TriggerConditions {
-    pub rainfall_threshold: Option<f64>,
-    pub temperature_threshold: Option<f64>,
-    pub wind_speed_threshold: Option<f64>,
-    pub water_level_threshold: Option<f64>,
-    pub fire_proximity_threshold: Option<f64>,
-    pub measurement_period: u32,
-    pub minimum_duration: u32,
+```move
+public struct ClimatePolicy has key, store {
+    id: object::UID,
+    owner: address,
+    status: u8,
+    coverage_amount: u64,
+    premium_amount: u64,
+    deposited_premium: u64,
+    pending_payout: u64,
+    trigger_rainfall: u64,
+    trigger_temperature: u64,
+    measurement_period: u64,
+    minimum_duration: u64,
+    end_timestamp: u64,
+    last_data_timestamp: u64,
+    last_data_value: u64,
+    last_data_confidence: u8,
 }
 ```
 
@@ -305,22 +288,22 @@ pub struct TriggerConditions {
 - Program authority for admin operations
 - Policy owner restrictions for policy management
 - Oracle provider authentication for data submission
-- PDA-based account validation
+- Object-based ownership validation
 
 ### Validation Checks
 
-- Geographic bounds validation (-90° to 90° latitude, -180° to 180° longitude)
-- Timestamp validation (data recency requirements)
+- Coverage and premium amount validation
+- Timestamp validation (policy expiration)
 - Confidence level thresholds for oracle data
-- Premium and coverage amount validation
-- Math overflow protection
+- Premium deposit validation
+- Math overflow protection (using u64 limits)
 
 ### Emergency Controls
 
 - Program pause/unpause functionality
 - Administrative override capabilities
-- Oracle reputation management
-- Risk pool protection mechanisms
+- Oracle data validation
+- Risk pool balance checks
 
 ## 🌐 Oracle Integration
 
@@ -451,7 +434,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Sui Labs for the robust blockchain platform
-- Anchor Framework for excellent Sui development tools
+- Move programming language for smart contract development
 - Climate data providers and oracle networks
 - Insurance industry experts and advisors
 - Open source community contributors
