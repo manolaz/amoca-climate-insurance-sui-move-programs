@@ -1,7 +1,5 @@
 module amoca_insurance_package::amoca_insurance_package;
 
-use sui::tx_context::{Self, TxContext};
-
 // ------------------------------------------------------------------------
 // Error codes (aligned with README documentation)
 // ------------------------------------------------------------------------
